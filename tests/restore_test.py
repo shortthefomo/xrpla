@@ -818,7 +818,7 @@ class Restore(unittest.TestCase):
 
     def test_setup_restore_runs_once(self):
         config, out = self.root / 'etc-restore' / 'xrpla.toml', self.root / 'setup-restore'
-        printed = self.setup(config, ['restore', str(self.bucket), str(self.key), 'earliest', 'rocksdb', str(out), 'y'])
+        printed = self.setup(config, ['restore', '', str(self.bucket), str(self.key), 'earliest', 'rocksdb', str(out), 'y'])
         self.assertEqual(tomllib.loads(config.read_text())['restore'], {'target': 'rocksdb', 'out': str(out)})
         result = json.loads(printed[printed.index('{\n'):])
         self.assertEqual(result['last_hash'], self.restore('rocksdb', self.root / 'restored-rocksdb-3')['last_hash'])
@@ -828,7 +828,7 @@ class Restore(unittest.TestCase):
     def test_setup_mirror_writes_service(self):
         config = self.root / 'etc-mirror' / 'xrpla.toml'
         hex_key = self.key.read_bytes().hex()
-        printed = self.setup(config, ['mirror', str(self.bucket), hex_key, '', str(self.root / 'mirror-store'), '1024', '127.0.0.1:0', '', '60'])
+        printed = self.setup(config, ['mirror', '', str(self.bucket), hex_key, '', str(self.root / 'mirror-store'), '1024', '127.0.0.1:0', '', '60'])
         # The unit runs the program setup ran as: a build tree's is named, as one to replace.
         program = Path(BINARY).resolve()
         if not str(program).startswith('/usr/'):
@@ -873,7 +873,7 @@ class Restore(unittest.TestCase):
         config = self.root / 'etc-connected' / 'xrpla.toml'
         # RPC, gRPC, then fallback (empty), then the validator answers. The fallback question
         # follows gRPC so an older answer script still lines the gRPC URL up.
-        self.setup(config, ['connected', 'http://127.0.0.1:5005', '', '', 'y', '', '', '', '', '123', str(self.root / 'connected-store'), '', '', ''])
+        self.setup(config, ['connected', '', 'http://127.0.0.1:5005', '', '', 'y', '', '', '', '', '123', str(self.root / 'connected-store'), '', '', ''])
         written = tomllib.loads(config.read_text())
         self.assertEqual(written['profile'], 'connected')
         self.assertNotIn('publication', written)
@@ -882,10 +882,21 @@ class Restore(unittest.TestCase):
         self.assertEqual((written['connected']['start'], written['serve']['http'], written['storage']['cache_mb']), (123, '127.0.0.1:5105', 0))
         self.assertIn(f'xrpla run --config {config}', (self.root / 'units' / 'xrpla.service').read_text())
 
+    def test_setup_connected_xahau_uses_its_validator_list(self):
+        config = self.root / 'etc-xahau' / 'xrpla.toml'
+        self.setup(config, ['connected', 'xahau', 'http://127.0.0.1:5005', '', '', 'y', '', '', '', '', '123',
+                            str(self.root / 'xahau-store'), '', '', ''])
+        written = tomllib.loads(config.read_text())
+        self.assertEqual(written['network'], {'id': 'xahau'})
+        self.assertEqual(written['node']['rpc'], 'http://127.0.0.1:5005')
+        self.assertEqual(written['validators']['list'], 'https://vl.xahau.org')
+        self.assertEqual(written['validators']['list_key'],
+                         'EDA46E9C39B1389894E690E58914DC1029602870370A0993E5B87C4A24EAF4A8E8')
+
     def test_setup_connected_with_a_publication(self):
         config = self.root / 'etc-connected-pub' / 'xrpla.toml'
         hex_key = self.key.read_bytes().hex()
-        self.setup(config, ['connected', 'http://127.0.0.1:5005', '', '', 'n', str(self.bucket), hex_key, str(self.root / 'connected-pub-store'), '', '', ''])
+        self.setup(config, ['connected', '', 'http://127.0.0.1:5005', '', '', 'n', str(self.bucket), hex_key, str(self.root / 'connected-pub-store'), '', '', ''])
         written = tomllib.loads(config.read_text())
         self.assertEqual(written['publication']['source'], str(self.bucket))
         self.assertEqual((config.parent / 'publisher.pub').read_text().strip(), hex_key)
@@ -893,7 +904,7 @@ class Restore(unittest.TestCase):
 
     def test_setup_standalone_writes_service(self):
         config = self.root / 'etc-standalone' / 'xrpla.toml'
-        self.setup(config, ['standalone', str(self.bucket), str(self.key), '', str(self.root / 'standalone-store'), '', '', ''])
+        self.setup(config, ['standalone', '', str(self.bucket), str(self.key), '', str(self.root / 'standalone-store'), '', '', ''])
         written = tomllib.loads(config.read_text())
         self.assertEqual((written['profile'], written['publication']['source'], written['serve']['http']), ('standalone', str(self.bucket), '127.0.0.1:5005'))
         self.assertNotIn('mirror', written)
@@ -902,7 +913,7 @@ class Restore(unittest.TestCase):
     def test_setup_connected_fallback_defaults_validators_to_yes(self):
         config = self.root / 'etc-connected-fallback' / 'xrpla.toml'
         # An empty answer on the validator question takes the default, which is yes once a fallback is given.
-        self.setup(config, ['connected', 'http://127.0.0.1:5005', '', 'wss://api.example.com', '', '', '', '', '',
+        self.setup(config, ['connected', '', 'http://127.0.0.1:5005', '', 'wss://api.example.com', '', '', '', '', '',
                             'tip', str(self.root / 'connected-fallback-store'), '', '', ''])
         written = tomllib.loads(config.read_text())
         self.assertEqual(written['node']['rpc'], 'http://127.0.0.1:5005')
@@ -910,7 +921,7 @@ class Restore(unittest.TestCase):
         self.assertEqual(written['validators']['list'], 'https://vl.ripple.com')
         self.assertEqual(written['node']['validations'], 'ws://127.0.0.1:6006')
         declined = self.root / 'etc-connected-fallback-no' / 'xrpla.toml'
-        printed = self.setup(declined, ['connected', 'http://127.0.0.1:5005', '', 'wss://api.example.com', 'n', '',
+        printed = self.setup(declined, ['connected', '', 'http://127.0.0.1:5005', '', 'wss://api.example.com', 'n', '',
                                         'tip', str(self.root / 'connected-fallback-no-store'), '', '', ''])
         self.assertNotIn('validators', tomllib.loads(declined.read_text()))
         self.assertIn('Warning: a fallback node is trusted on its word', printed)
@@ -919,7 +930,7 @@ class Restore(unittest.TestCase):
         # An answer script from before fallbacks puts its validator answer ('y') on the fallback
         # question. It is asked again rather than written into the config.
         config = self.root / 'etc-connected-fallback-typo' / 'xrpla.toml'
-        printed = self.setup(config, ['connected', 'http://127.0.0.1:5005', '', 'y', 'api.example.com, wss://ok.example.com',
+        printed = self.setup(config, ['connected', '', 'http://127.0.0.1:5005', '', 'y', 'api.example.com, wss://ok.example.com',
                                       'wss://api.example.com', 'n', '', 'tip', str(self.root / 'connected-fallback-typo-store'), '', '', ''])
         self.assertEqual(printed.count('Please answer with http(s):// or ws(s):// URLs'), 2)
         self.assertEqual(tomllib.loads(config.read_text())['node']['fallback'], ['wss://api.example.com'])

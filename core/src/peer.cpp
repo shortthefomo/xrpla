@@ -126,7 +126,8 @@ NodeIdentity NodeIdentity::load_or_create(fs::path const& file) {
 std::string NodeIdentity::base58() const {
     return r::toBase58(r::TokenType::NodePublic, r::PublicKey(r::Slice(public_key.data(), public_key.size())));
 }
-std::optional<NetworkDefaults> network_defaults(std::uint32_t network_id) {
+namespace {
+std::vector<NetworkDefaults> const& known_networks() {
     static std::vector<NetworkDefaults> const known{
         // xrpld's own bootstrap hubs (OverlayImpl::start: Ripple, ISRDC, XRPKuwait, XRPL Commons),
         // then Ripple's full-history servers, which also hold ledgers most peers have deleted.
@@ -136,8 +137,19 @@ std::optional<NetworkDefaults> network_defaults(std::uint32_t network_id) {
         {1, "testnet", {"s.altnet.rippletest.net:51235", "r.altnet.rippletest.net:51235"},
          "https://vl.altnet.rippletest.net", "ED264807102805220DA0F312E71FC2C69E1552C9C5790F6C25E3729DEB573D5860"},
         {2, "devnet", {"s.devnet.rippletest.net:51235"},
-         "https://vl.devnet.rippletest.net", "EDBB54B0D9AEE071BB37784AF5A9E7CC49AC7A0EFCE868C54532BCB966B9CFC13B"}};
-    for (auto const& network : known) if (network.id == network_id) return network;
+         "https://vl.devnet.rippletest.net", "EDBB54B0D9AEE071BB37784AF5A9E7CC49AC7A0EFCE868C54532BCB966B9CFC13B"},
+        // xahaud. Same peer protocol as xrpld (XRPL/2.2); its own network id, peer port, hubs and
+        // validator list. https://xahau.network/docs/infrastructure/running-a-node/running-a-mainnet-node/
+        {21337, "xahau", {"bacab.alloy.ee:21337", "hubs.xahau.as16089.net:21337", "xahau-1.cabbit.tech:21337", "xahau-2.cabbit.tech:21337"},
+         "https://vl.xahau.org", "EDA46E9C39B1389894E690E58914DC1029602870370A0993E5B87C4A24EAF4A8E8"},
+        // Xahau testnet. The list is the one vl.test.xahauexplorer.com publishes.
+        {21338, "xahau-testnet", {"79.110.60.121:21338", "79.110.60.122:21338", "79.110.60.124:21338", "79.110.60.125:21338"},
+         "https://vl.test.xahauexplorer.com", "EDED8F699B46702A9ACD8D6C39ECB1C627842554C88BCFCCAF5F907FEB92A7B5E9"}};
+    return known;
+}
+}
+std::optional<NetworkDefaults> network_defaults(std::uint32_t network_id) {
+    for (auto const& network : known_networks()) if (network.id == network_id) return network;
     return std::nullopt;
 }
 std::pair<std::string, std::string> network_validator_list(std::uint32_t network_id) {
@@ -146,11 +158,14 @@ std::pair<std::string, std::string> network_validator_list(std::uint32_t network
 }
 std::uint32_t parse_network(std::string const& text) {
     if (text == "main") return 0;
-    for (std::uint32_t id = 0; id < 3; ++id) if (network_defaults(id)->name == text) return id;
+    // The daemon's name is accepted for the network it runs.
+    if (text == "xahaud") return 21337;
+    if (text == "xahaud-testnet") return 21338;
+    for (auto const& network : known_networks()) if (network.name == text) return network.id;
     std::uint32_t id = 0;
     auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), id);
     if (text.empty() || ec != std::errc{} || end != text.data() + text.size())
-        throw Error("Unknown network '" + text + "': mainnet, testnet, devnet or a network ID");
+        throw Error("Unknown network '" + text + "': mainnet, testnet, devnet, xahau, xahau-testnet or a network ID");
     return id;
 }
 std::vector<std::string> default_peers(std::uint32_t network_id) {

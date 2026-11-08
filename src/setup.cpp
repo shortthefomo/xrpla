@@ -116,13 +116,13 @@ ChosenPublication publication_of(toml::table const& t) {
     if (name.empty() && key.empty()) throw Error("Config needs publication.publisher_key");
     return choose_publication(name, source, key);
 }
-// [network] id: a network ID, or "mainnet", "testnet" or "devnet"; mainnet unless set.
+// [network] id: a network ID, or a name parse_network knows; mainnet unless set.
 std::uint32_t network_of(toml::table const& t) {
     auto node = t.at_path("network.id");
     if (!node) return 0;
     if (auto name = node.value<std::string>(); name && node.is_string()) return core::parse_network(*name);
     if (auto id = node.value<std::int64_t>(); id && node.is_integer() && *id >= 0 && *id <= UINT32_MAX) return static_cast<std::uint32_t>(*id);
-    throw Error("Config network.id must be mainnet, testnet, devnet or a network ID");
+    throw Error("Config network.id must be mainnet, testnet, devnet, xahau, xahau-testnet or a network ID");
 }
 // An integer setting held to the bounds `xrpla serve` holds its flag to: the interim server is
 // started with these as flags, and one out of bounds would fail to start every 30 s instead.
@@ -1541,9 +1541,11 @@ PublicationList offered_publications(Prompt& p) {
 // The network, asked when the list has publications of one other than mainnet; written to
 // [network] id unless it is mainnet.
 std::string ask_network(Prompt& p, PublicationList const& list, toml::table& config) {
-    std::vector<std::pair<std::string, std::string>> networks{{"mainnet", "the XRP Ledger"}};
+    std::vector<std::pair<std::string, std::string>> networks{{"mainnet", "the XRP Ledger (xrpld)"}};
     for (auto [network, about] : {std::pair{"testnet", "the XRP Ledger's test network"}, std::pair{"devnet", "the XRP Ledger's development network"}})
         if (std::any_of(list.entries.begin(), list.entries.end(), [&](Publication const& e) { return e.network == network; })) networks.emplace_back(network, about);
+    networks.emplace_back("xahau", "Xahau (xahaud)");
+    networks.emplace_back("xahau-testnet", "Xahau's test network (xahaud)");
     auto network = networks.size() == 1 ? std::string("mainnet") : p.choose("Which network?", networks, "mainnet");
     if (network != "mainnet") { toml::table id; id.insert("id", network); config.insert("network", id); }
     return network;
@@ -1585,7 +1587,7 @@ int setup_connected(fs::path const& config_path, fs::path const& unit_dir, toml:
     auto list = offered_publications(p);
     auto network = ask_network(p, list, config);
     auto [list_url, list_key] = core::network_validator_list(core::parse_network(network));
-    node.insert("rpc", p.ask("Node JSON-RPC URL (a local xrpld's admin port is not rate-limited)", "http://127.0.0.1:5005"));
+    node.insert("rpc", p.ask("Node JSON-RPC URL (a local xrpld or xahaud admin port is not rate-limited)", "http://127.0.0.1:5005"));
     // After the gRPC question, so an answer script written before fallbacks existed still puts
     // the gRPC URL on this question. The fallback answer is the new one, after it.
     if (auto grpc = p.ask("Node gRPC URL for ledger diffs (empty: JSON-RPC only)"); !grpc.empty()) node.insert("grpc", grpc);
@@ -1647,8 +1649,8 @@ int setup(fs::path const& config_path, fs::path const& unit_dir, std::istream& i
     auto profile = p.choose("How will this machine use XRPLA?", {
         {"mirror", "serve the XRPL RPC/WebSocket API from published history, kept current from the publication"},
         {"restore", "fill an xrpld (NuDB/RocksDB) or Clio database from published history once, then exit"},
-        {"connected", "follow your own or a remote xrpld a few seconds behind, keep its history compressed and serve it"},
-        {"standalone", "no xrpld: history from a publication, the newest ledgers from the XRPL peer network"},
+        {"connected", "follow your own or a remote xrpld or xahaud a few seconds behind, keep its history compressed and serve it"},
+        {"standalone", "no local daemon: history from a publication, the newest ledgers from the xrpld or xahaud peer network"},
         {"publisher", "follow a node and publish history to R2/S3 (tools/live_publisher.py today)"}}, "mirror");
     if (profile == "mirror" || profile == "connected" || profile == "standalone") {
         if (auto path = fs::absolute(config_path).string(); !unit_safe(path))

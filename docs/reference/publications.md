@@ -68,7 +68,7 @@ contact = "history@example.com"
 | Field | Required | Value |
 |---|---|---|
 | `name` | yes | a short id, lowercase letters, digits and `-`; unique in the list (`other` and `none` are kept for `xrpla setup`). What a configuration names. |
-| `network` | yes | `mainnet`, `testnet` or `devnet`. `xrpla setup` offers the entries of the network chosen, and writes `[network] id` for testnet and devnet. |
+| `network` | yes | `mainnet`, `testnet`, `devnet`, `xahau` or `xahau-testnet`. `xrpla setup` offers the entries of the network chosen, and writes `[network] id` unless it is mainnet. |
 | `publisher_key` | yes | the publisher's Ed25519 public key, 64 hexadecimal characters |
 | `mirrors` | yes | HTTPS base URLs, each the directory holding the publication's `catalog/current.json`, tried in order. No credentials, query or fragment. |
 | `first_ledger` | no | the first ledger the publication holds; shown, not checked |

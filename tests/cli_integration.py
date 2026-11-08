@@ -230,10 +230,11 @@ class SetupTests(unittest.TestCase):
         self.unit = self.root / "units" / "xrpla.service"
 
     def setup(self, storage, config=None, env=None, key=None, cwd=None):
-        # mirror: publication, publisher key, first ledger, the storage directory answers (asked
-        # again until one can be named in the unit), decode cache, listeners, sync interval. An
-        # empty publication list, so the publication is asked for by URL and key.
-        answers = ["mirror", str(self.root / "bucket"), key or str(self.root / "publisher.pub"), "", *storage, "", "", "", ""]
+        # mirror: network (default mainnet), publication, publisher key, first ledger, the storage
+        # directory answers (asked again until one can be named in the unit), decode cache,
+        # listeners, sync interval. An empty publication list, so the publication is asked for
+        # by URL and key.
+        answers = ["mirror", "", str(self.root / "bucket"), key or str(self.root / "publisher.pub"), "", *storage, "", "", "", ""]
         (self.root / "publications.toml").write_text("")
         env = {**(os.environ if env is None else env), "XRPLA_PUBLICATIONS": str(self.root / "publications.toml")}
         return subprocess.run([BINARY, "setup", "--config", str(config or self.config), "--unit-dir", str(self.unit.parent)],
@@ -457,7 +458,7 @@ class ListedPublicationTests(unittest.TestCase):
 
     def test_setup_goes_on_without_a_list_it_cannot_read(self):
         self.list.write_text("[[publication]\n", encoding="utf-8")
-        printed, written = self.setup("https://elsewhere.example.com/pub", "0123456789abcdef" * 4)
+        printed, written = self.setup("", "https://elsewhere.example.com/pub", "0123456789abcdef" * 4)
         self.assertIn("Not offering the publication list: The publication list " + str(self.list) + " is not valid TOML", printed)
         self.assertEqual(written["publication"]["source"], "https://elsewhere.example.com/pub")
 

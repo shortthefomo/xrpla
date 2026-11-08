@@ -1203,6 +1203,10 @@ TEST(PeerSessions, NetworksKnownByNameBringTheirHubsAndValidatorLists) {
     EXPECT_EQ(parse_network("main"), 0u);
     EXPECT_EQ(parse_network("testnet"), 1u);
     EXPECT_EQ(parse_network("devnet"), 2u);
+    EXPECT_EQ(parse_network("xahau"), 21337u);
+    EXPECT_EQ(parse_network("xahaud"), 21337u);
+    EXPECT_EQ(parse_network("xahau-testnet"), 21338u);
+    EXPECT_EQ(parse_network("xahaud-testnet"), 21338u);
     EXPECT_EQ(parse_network("21337"), 21337u);
     EXPECT_THROW(parse_network("moonnet"), Error);
     EXPECT_THROW(parse_network(""), Error);
@@ -1211,10 +1215,17 @@ TEST(PeerSessions, NetworksKnownByNameBringTheirHubsAndValidatorLists) {
     EXPECT_EQ(default_peers(2), (std::vector<std::string>{"s.devnet.rippletest.net:51235"}));
     EXPECT_EQ(network_defaults(1)->list, "https://vl.altnet.rippletest.net");
     EXPECT_EQ(network_defaults(2)->list_key, "EDBB54B0D9AEE071BB37784AF5A9E7CC49AC7A0EFCE868C54532BCB966B9CFC13B");
-    EXPECT_TRUE(default_peers(21337).empty());
+    EXPECT_EQ(network_defaults(21337)->name, "xahau");
+    EXPECT_EQ(default_peers(21337), (std::vector<std::string>{"bacab.alloy.ee:21337", "hubs.xahau.as16089.net:21337",
+                                                             "xahau-1.cabbit.tech:21337", "xahau-2.cabbit.tech:21337"}));
+    EXPECT_EQ(network_defaults(21337)->list, "https://vl.xahau.org");
+    EXPECT_EQ(network_defaults(21337)->list_key, "EDA46E9C39B1389894E690E58914DC1029602870370A0993E5B87C4A24EAF4A8E8");
+    EXPECT_EQ(network_defaults(21338)->list, "https://vl.test.xahauexplorer.com");
+    EXPECT_EQ(network_defaults(21338)->list_key, "EDED8F699B46702A9ACD8D6C39ECB1C627842554C88BCFCCAF5F907FEB92A7B5E9");
+    EXPECT_TRUE(default_peers(9).empty());
     // A network with no hubs known by name needs its peers listed.
     PeerLedgers::Options options;
-    options.network_id = 21337;
+    options.network_id = 9;
     EXPECT_THROW(PeerLedgers(options, nullptr, nullptr), Error);
 }
 

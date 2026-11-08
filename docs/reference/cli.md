@@ -19,8 +19,9 @@ Common conventions:
   `--publisher-key` given must be the listed key.
 - **Ranges** (`--range`): `A-B`, or `A-` for A to the publication's tip. The v2 archive commands
   also take `latest-N` and `Nd`.
-- **Network** (`--network-id`): `mainnet` (default), `testnet`, `devnet`, or a numeric network
-  ID. The named networks bring their public hubs and validator list.
+- **Network** (`--network-id`): `mainnet` (default), `testnet`, `devnet`, `xahau` (xahaud, also
+  `xahaud`), `xahau-testnet`, or a numeric network ID. The named networks bring their public
+  hubs and validator list. One process follows one network.
 - `--jobs` values are 1-32.
 
 ## Profiles

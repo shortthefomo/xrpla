@@ -41,8 +41,9 @@ Publication entry(toml::table const& table) {
     // setup offers the list's names beside these two.
     if (publication.name == "other" || publication.name == "none") throw Error("its name is one setup keeps for itself");
     publication.network = string("network", true);
-    if (publication.network != "mainnet" && publication.network != "testnet" && publication.network != "devnet")
-        throw Error("its network must be mainnet, testnet or devnet");
+    if (publication.network != "mainnet" && publication.network != "testnet" && publication.network != "devnet" &&
+        publication.network != "xahau" && publication.network != "xahau-testnet")
+        throw Error("its network must be mainnet, testnet, devnet, xahau or xahau-testnet");
     publication.publisher_key = string("publisher_key", true);
     if (!hex64(publication.publisher_key)) throw Error("its publisher_key must be 64 hexadecimal characters");
     publication.publisher_key = lowercase(publication.publisher_key);

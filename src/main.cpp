@@ -109,8 +109,9 @@ Clio without --host writes a reviewable import plan. Password: XRPLA_CQL_PASSWOR
 nfts_by_issuer answer Clio's methods of those names; one left out is not built, or removed.
 --snapshots-every N: sync also keeps each published state snapshot at a multiple of N ledgers
 (0, the default: only the base and the newest), so older ledgers' state is read faster.
---network-id: mainnet (the default), testnet, devnet, or a network ID. The three named networks
-bring their public hubs (--peers default, peers) and validator list (peers, publish --peers).
+--network-id: mainnet (the default), testnet, devnet, xahau (xahaud; also "xahaud"),
+xahau-testnet, or a network ID. The named networks bring their public hubs (--peers default,
+peers) and validator list (peers, publish --peers). One process follows one network.
 )";
 
 // A flag's whole value as an integer from `low` to `high` ("-1" or "8GB" is refused, not wrapped

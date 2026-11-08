@@ -227,11 +227,12 @@ struct ServeOptions {
 };
 // The network ID for responses in this process (serve sets it from ServeOptions).
 void configure_network(std::uint32_t network_id);
-// A network given by name ("mainnet" or "main", "testnet", "devnet") or by its ID. Mainnet,
-// testnet and devnet also bring their public hubs and validator lists as defaults.
+// A network given by name ("mainnet" or "main", "testnet", "devnet", "xahau" or "xahaud",
+// "xahau-testnet" or "xahaud-testnet") or by its ID. Those named networks also bring their
+// public hubs and validator lists as defaults. One process follows one network.
 std::uint32_t parse_network(std::string const& text);
-// The validator list a network known by name (mainnet, testnet, devnet) uses, and its
-// publisher's key; empty for any other network.
+// The validator list a network known by name uses, and its publisher's key; empty for any
+// other network.
 std::pair<std::string, std::string> network_validator_list(std::uint32_t network_id);
 // For one-shot `xrpla rpc` requests over a piece cache plus a spool tail.
 void use_tail(fs::path const& dir, fs::path const& tail, fs::path const& tail_key);

@@ -223,11 +223,13 @@
 # Read by: mirror, connected, standalone.
 #[network]
 
-# The network: "mainnet" (the default; also 0 or "main"), "testnet" (1), "devnet" (2), or
-# another network's ID. It appears in responses (network_id, ctid) and in the peer handshake,
-# where peers of any other network are refused. For mainnet, testnet and devnet it also picks
-# the defaults of [peers] endpoints (the network's public hubs) and [validators] (its validator
-# list); another network needs both set.
+# The network: "mainnet" (the default; also 0 or "main"), "testnet" (1), "devnet" (2),
+# "xahau" (21337, the xahaud network; also "xahaud"), "xahau-testnet" (21338), or another
+# network's ID. One process follows one network, so tracking xrpld and xahaud is two
+# processes. It appears in responses (network_id, ctid) and in the peer handshake, where
+# peers of any other network are refused. For the named networks it also picks the defaults
+# of [peers] endpoints (the network's public hubs) and [validators] (its validator list);
+# another network needs both set.
 #id = "mainnet"
 
 # ---------------------------------------------------------------------------------------------
@@ -297,13 +299,16 @@
 #[validators]
 
 # The validator list: an HTTPS URL or a local file. Standalone defaults: https://vl.ripple.com
-# (mainnet), https://vl.altnet.rippletest.net (testnet), https://vl.devnet.rippletest.net (devnet).
+# (mainnet), https://vl.altnet.rippletest.net (testnet), https://vl.devnet.rippletest.net (devnet),
+# https://vl.xahau.org (xahau), https://vl.test.xahauexplorer.com (xahau-testnet).
 #list = "https://vl.ripple.com"
 
 # The list publisher's public key (hex), which the list and its validators' manifests are
 # checked against. Standalone defaults: ED2677ABFFD1B33AC6FBC3062B71F1E8397C1505E1C42C64D11AD1B28FF73F4734
 # (mainnet), ED264807102805220DA0F312E71FC2C69E1552C9C5790F6C25E3729DEB573D5860 (testnet),
-# EDBB54B0D9AEE071BB37784AF5A9E7CC49AC7A0EFCE868C54532BCB966B9CFC13B (devnet).
+# EDBB54B0D9AEE071BB37784AF5A9E7CC49AC7A0EFCE868C54532BCB966B9CFC13B (devnet),
+# EDA46E9C39B1389894E690E58914DC1029602870370A0993E5B87C4A24EAF4A8E8 (xahau),
+# EDED8F699B46702A9ACD8D6C39ECB1C627842554C88BCFCCAF5F907FEB92A7B5E9 (xahau-testnet).
 #list_key = "ED2677ABFFD1B33AC6FBC3062B71F1E8397C1505E1C42C64D11AD1B28FF73F4734"
 
 # ---------------------------------------------------------------------------------------------
@@ -362,7 +367,8 @@
 # its network's public hubs ([network] id: for mainnet, xrpld's r.ripple.com, sahyadri.isrdc.in,
 # hubs.xrpkuwait.com and hub.xrpl-commons.org, then s1.ripple.com and s2.ripple.com;
 # s.altnet.rippletest.net and r.altnet.rippletest.net for testnet,
-# s.devnet.rippletest.net for devnet), then prefers peers the network names.
+# s.devnet.rippletest.net for devnet; for xahau, bacab.alloy.ee, hubs.xahau.as16089.net,
+# xahau-1.cabbit.tech and xahau-2.cabbit.tech on port 21337), then prefers peers the network names.
 #endpoints = ["r.ripple.com:51235"]
 
 # Peers this node connects to itself (xrpld's [peers_out_max]).

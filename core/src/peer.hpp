@@ -139,8 +139,9 @@ public:
 };
 
 // The public networks known by name, with what a node needs to join one: its public hubs (for
-// a first connection) and its validator list and the list publisher's key, as xrpl.org gives them.
-// Any other network names its peers and validator list in the configuration.
+// a first connection) and its validator list and the list publisher's key. XRPL's come from
+// xrpl.org; Xahau's (xahaud) from xahau.network. Any other network names its peers and
+// validator list in the configuration.
 struct NetworkDefaults {
     std::uint32_t id;
     std::string name;

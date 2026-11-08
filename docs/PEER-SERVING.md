@@ -122,10 +122,12 @@ that lasted and that the peer ended. With `private = true` the node uses only `e
 (the hubs when none are given), never advertises itself and keeps its address out of
 crawls, as xrpld's `peer_private`.
 
-The network is mainnet unless `[network] id` says otherwise (`"testnet"`, `"devnet"` or another
-network's ID). Every handshake, in and out, carries it and refuses a peer of another network.
-For mainnet, testnet and devnet it also picks the public hubs the node joins through and the
-validator list it trusts; another network needs `endpoints` and `[validators]` set. A
+The network is mainnet unless `[network] id` says otherwise (`"testnet"`, `"devnet"`, `"xahau"`,
+`"xahau-testnet"` or another network's ID). `"xahau"` is the xahaud network (21337, peer port
+21337); one process follows one network, so xrpld and xahaud are two processes. Every handshake,
+in and out, carries the id and refuses a peer of another network. For each named network it
+also picks the public hubs the node joins through and the validator list it trusts; another
+network needs `endpoints` and `[validators]` set. A
 network's nodes keep dialling an address they once knew on it (after a node of that network
 ran there): each such dial is refused once its handshake shows the network, and counted in
 `handshake_failures` (`Refused: Peer is on network N`). A refusal costs one TLS handshake, about

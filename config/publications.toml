@@ -18,7 +18,7 @@
 #
 # Each entry:
 #   name           a short id, lowercase letters, digits and -; what a configuration names
-#   network        "mainnet", "testnet" or "devnet"
+#   network        "mainnet", "testnet", "devnet", "xahau" or "xahau-testnet"
 #   publisher_key  the publisher's Ed25519 public key, 64 hexadecimal characters
 #   mirrors        HTTPS base URLs (each the directory holding catalog/current.json), tried in order
 #   first_ledger   the first ledger the publication holds (informational)
