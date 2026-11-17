@@ -586,8 +586,45 @@ public:
     std::vector<ObjectRecord> peer_changes(Header const& header, LedgerVerifier const& parent) const {
         return with_history(header.sequence, [&](PeerLedgers& peers) { return peers.changes(header, parent); });
     }
-    void history(std::vector<std::string> peers, fs::path identity, std::uint32_t network_id) {
+    // `named`: the operator passed this network id. Otherwise the id the source reports
+    // (server_info info.network_id; omitted means mainnet) is the one history peers follow,
+    // so a xahaud node's ledgers are not fetched from XRPL mainnet hubs. Asked once, before
+    // any peer handshake: the handshake has to present the id.
+    void history(std::vector<std::string> peers, fs::path identity, std::uint32_t network_id, bool named) {
         history_peers_ = std::move(peers); history_identity_ = std::move(identity); network_id_ = network_id;
+        if (urls_.empty()) {
+            if (!named && history_peers_ == std::vector<std::string>{"default"})
+                std::cerr << Json{{"event", "network_id"}, {"network_id", network_id_},
+                                  {"detail", "a gRPC source does not report a network id; pass --network-id for any network but mainnet"}}.dump()
+                          << std::endl;
+            return;
+        }
+        std::optional<std::uint32_t> reported;
+        std::string from, errors;
+        bool unreachable = false;
+        for (auto const& url : urls_) {
+            try {
+                auto result = call_sources({url}, "server_info", Json::object(), delay_ms_, 2, {});
+                auto id = reported_network_id(result);
+                if (!id) { errors += url + ": no network id; "; continue; }
+                if (reported && *reported != *id)
+                    throw Blocked(url + " is on network " + std::to_string(*id) + " but " + from + " is on network " + std::to_string(*reported));
+                if (!reported) from = url;
+                reported = id;
+            } catch (Blocked const&) { throw; }
+            catch (std::exception const& error) { unreachable = true; errors += url + ": " + error.what() + "; "; }
+        }
+        if (!reported) {
+            // Still down, and history peers would otherwise assume mainnet: fail this attempt
+            // and try again once the node answers, rather than crawl the wrong network.
+            if (!named && unreachable && !history_peers_.empty())
+                throw Error("Could not read the source's network id (" + errors + ")");
+            return;
+        }
+        auto id = network_id_from_node(network_id_, named, reported);
+        if (id != network_id_ || !named)
+            std::cerr << Json{{"event", "network_id"}, {"network_id", id}, {"source", from}}.dump() << std::endl;
+        network_id_ = id;
     }
     // Ledgers are cached in `cache` and state pages in `state_cache` (JSON-RPC; empty: none).
     // `fallbacks` are asked, in order, for a ledger this source does not hold or when it cannot
@@ -1135,7 +1172,7 @@ Json export_locked(ExportOptions const& options, PeerLedgers* peers = nullptr, P
     std::optional<NodeSource> own_source;
     if (!kept_source) {
         own_source.emplace(options.source, options.grpc_source, options.append ? fs::path{} : cache, cache, options.delay_ms, options.fallbacks);
-        own_source->history(options.history_peers, options.history_identity, options.network_id);
+        own_source->history(options.history_peers, options.history_identity, options.network_id, options.network_id_set);
     }
     auto& source = kept_source ? *kept_source : *own_source;
     Json manifest;
@@ -2442,7 +2479,12 @@ Json publish_archive(PublishOptions const& options) {
     auto open_node = [&] {
         if (node) return;
         node.emplace(input.source, input.grpc_source, fs::path{}, input.rpc_cache ? input.output / ".rpc-cache" : fs::path{}, input.delay_ms, input.fallbacks);
-        node->history(input.history_peers, input.history_identity, input.network_id);
+        try {
+            node->history(input.history_peers, input.history_identity, input.network_id, input.network_id_set);
+        } catch (...) {
+            node.reset();
+            throw;
+        }
     };
     bool from_peers = !options.peers.empty();
     bool trusting_validators = from_peers || !options.validator_list.empty();

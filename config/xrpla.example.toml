@@ -229,7 +229,9 @@
 # processes. It appears in responses (network_id, ctid) and in the peer handshake, where
 # peers of any other network are refused. For the named networks it also picks the defaults
 # of [peers] endpoints (the network's public hubs) and [validators] (its validator list);
-# another network needs both set.
+# another network needs both set. A profile that follows a node and leaves this unset uses
+# the network id that node reports (server_info). Standalone has no node to ask, so an unset
+# id follows mainnet. A value the node does not report stops the run.
 #id = "mainnet"
 
 # ---------------------------------------------------------------------------------------------

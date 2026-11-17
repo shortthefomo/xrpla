@@ -116,14 +116,16 @@ ChosenPublication publication_of(toml::table const& t) {
     if (name.empty() && key.empty()) throw Error("Config needs publication.publisher_key");
     return choose_publication(name, source, key);
 }
-// [network] id: a network ID, or a name parse_network knows; mainnet unless set.
-std::uint32_t network_of(toml::table const& t) {
+// [network] id: a network ID, or a name parse_network knows. Unset: the node follower takes
+// the id the node reports, and a peer follower stays on mainnet (its hubs are chosen by this).
+std::optional<std::uint32_t> configured_network(toml::table const& t) {
     auto node = t.at_path("network.id");
-    if (!node) return 0;
+    if (!node) return std::nullopt;
     if (auto name = node.value<std::string>(); name && node.is_string()) return core::parse_network(*name);
     if (auto id = node.value<std::int64_t>(); id && node.is_integer() && *id >= 0 && *id <= UINT32_MAX) return static_cast<std::uint32_t>(*id);
     throw Error("Config network.id must be mainnet, testnet, devnet, xahau, xahau-testnet or a network ID");
 }
+std::uint32_t network_of(toml::table const& t) { return configured_network(t).value_or(0); }
 // An integer setting held to the bounds `xrpla serve` holds its flag to: the interim server is
 // started with these as flags, and one out of bounds would fail to start every 30 s instead.
 std::optional<std::int64_t> bounded(toml::table const& t, std::string_view path, std::int64_t low, std::int64_t high) {
@@ -451,26 +453,42 @@ int run_child(std::vector<std::string> args) {
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
     return WIFEXITED(status) ? WEXITSTATUS(status) : 128;
 }
-// The first ledger of a node's newest contiguous range of complete ledgers.
-std::uint32_t node_first_ledger(std::string const& url) {
+// The first ledger of a node's newest contiguous range of complete ledgers, and the network
+// id it reports (server_info; omitted means mainnet).
+struct NodeLedger {
+    std::uint32_t first = 0;
+    std::uint32_t network_id = 0;
+};
+NodeLedger node_ledger(std::string const& url) {
     auto info = core::call_sources({url}, "server_info", Json::object(), 0, 5, {});
+    auto id = core::reported_network_id(info);
+    if (!id) throw Error("The node did not report a network id");
     auto ranges = info.at("info").at("complete_ledgers").get<std::string>();
     auto last = ranges.substr(ranges.rfind(',') == std::string::npos ? 0 : ranges.rfind(',') + 1);
     if (last.empty() || last == "empty") throw Error("The node has no complete ledgers yet");
-    return static_cast<std::uint32_t>(std::stoul(last.substr(0, last.find('-'))));
+    return {static_cast<std::uint32_t>(std::stoul(last.substr(0, last.find('-')))), *id};
 }
-// The earliest ledger any of the nodes still holds. One that cannot be asked is skipped.
-std::uint32_t earliest_complete(std::vector<std::string> const& urls) {
-    std::optional<std::uint32_t> earliest;
+// The earliest ledger any of the nodes still holds, and the network they agree on. One that
+// cannot be asked is skipped. Two that report different network ids stop the run.
+struct NodesFollowed {
+    std::uint32_t first = 0;
+    std::uint32_t network_id = 0;
+};
+NodesFollowed nodes_followed(std::vector<std::string> const& urls) {
+    std::optional<NodesFollowed> seen;
     std::string errors;
     for (auto const& url : urls) {
         try {
-            auto first = node_first_ledger(url);
-            earliest = earliest ? std::min(*earliest, first) : first;
-        } catch (std::exception const& error) { errors += url + ": " + error.what() + "; "; }
+            auto node = node_ledger(url);
+            if (seen && seen->network_id != node.network_id)
+                throw core::Blocked(url + " is on network " + std::to_string(node.network_id) + " but another node is on network " + std::to_string(seen->network_id));
+            if (!seen) seen = NodesFollowed{node.first, node.network_id};
+            else seen->first = std::min(seen->first, node.first);
+        } catch (core::Blocked const&) { throw; }
+        catch (std::exception const& error) { errors += url + ": " + error.what() + "; "; }
     }
-    if (!earliest) throw Error("No node reported complete ledgers (" + errors + ")");
-    return *earliest;
+    if (!seen) throw Error("No node reported complete ledgers (" + errors + ")");
+    return *seen;
 }
 std::string peer_list(toml::table const& config) {
     std::string list;
@@ -562,10 +580,20 @@ int run_mirrored(toml::table const& config, std::string const& profile) {
     extend_from_publication();
     std::vector<std::string> common{exe.string(), "publish", "--out", spool.string(), "--signing-key", seed.string(), "--merge-chunks",
         "--interval", std::to_string(knob("poll_seconds", 3)), "--batch-ledgers", "64"};
+    auto named_network = configured_network(config);
     auto from_network = common;
+    // Standalone has no node to ask, so an unset [network] id stays mainnet. A node profile
+    // replaces this with the id the node reports before peers are asked to fill a gap.
     for (auto const& arg : std::vector<std::string>{"--peers", peer_list(config), "--peer-identity", (keys / "node.key").string(),
-                                                    "--network-id", std::to_string(network_of(config))})
+                                                    "--network-id", std::to_string(named_network.value_or(0))})
         from_network.push_back(arg);
+    auto with_network_id = [](std::vector<std::string> args, std::uint32_t id) {
+        for (std::size_t i = 0; i + 1 < args.size(); ++i)
+            if (args[i] == "--network-id") { args[i + 1] = std::to_string(id); return args; }
+        args.push_back("--network-id");
+        args.push_back(std::to_string(id));
+        return args;
+    };
     // Serving the peer network (off by default; docs/PEER-SERVING.md).
     if (auto outbound = integer(config, "peers.outbound")) { from_network.push_back("--peer-connections"); from_network.push_back(std::to_string(*outbound)); }
     // As an xrpld on the peer network: its peer limit, privacy, and relaying (docs/PEER-SERVING.md).
@@ -606,13 +634,16 @@ int run_mirrored(toml::table const& config, std::string const& profile) {
             if (stopping) return;
             try {
                 auto tip = Json::parse(read_file(spool / "manifest.json", 16 << 20)).at("tip").at("seq").get<std::uint32_t>();
-                auto first = earliest_complete(endpoints);
-                if (tip + 1 >= first) break;
-                std::cerr << Json{{"event", "filling_gap_from_peers"}, {"from", tip + 1}, {"until", first}}.dump() << std::endl;
-                auto fill = from_network;
-                fill.push_back("--until"); fill.push_back(std::to_string(first));
+                auto followed = nodes_followed(endpoints);
+                if (named_network && *named_network != followed.network_id)
+                    throw core::Blocked("The node is on network " + std::to_string(followed.network_id) + ", not " + std::to_string(*named_network) + " ([network] id)");
+                if (tip + 1 >= followed.first) break;
+                std::cerr << Json{{"event", "filling_gap_from_peers"}, {"from", tip + 1}, {"until", followed.first}, {"network_id", followed.network_id}}.dump() << std::endl;
+                auto fill = with_network_id(from_network, followed.network_id);
+                fill.push_back("--until"); fill.push_back(std::to_string(followed.first));
                 if (run_child(fill) == 0) break;
-            } catch (std::exception const& error) { std::cerr << Json{{"event", "gap_fill_failed"}, {"error", error.what()}}.dump() << std::endl; }
+            } catch (core::Blocked const&) { throw; }
+            catch (std::exception const& error) { std::cerr << Json{{"event", "gap_fill_failed"}, {"error", error.what()}}.dump() << std::endl; }
             std::this_thread::sleep_for(std::chrono::seconds(30));
         }
     };
@@ -625,6 +656,9 @@ int run_mirrored(toml::table const& config, std::string const& profile) {
             for (auto const& arg : std::vector<std::string>{"--validator-list", list, "--validator-list-key", required(config, "validators.list_key"),
                                                             "--validations-node", required(config, "node.validations")})
                 args.push_back(arg);
+        // A named [network] id is checked against the node. With none, the follower reads the
+        // node's server_info and follows that network (history peers included).
+        if (named_network) { args.push_back("--network-id"); args.push_back(std::to_string(*named_network)); }
         fill_gap();
     }
     auto name = from_peers ? "peer_follower" : "node_follower";

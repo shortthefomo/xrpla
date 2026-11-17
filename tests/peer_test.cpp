@@ -1222,6 +1222,28 @@ TEST(PeerSessions, NetworksKnownByNameBringTheirHubsAndValidatorLists) {
     EXPECT_EQ(network_defaults(21337)->list_key, "EDA46E9C39B1389894E690E58914DC1029602870370A0993E5B87C4A24EAF4A8E8");
     EXPECT_EQ(network_defaults(21338)->list, "https://vl.test.xahauexplorer.com");
     EXPECT_EQ(network_defaults(21338)->list_key, "EDED8F699B46702A9ACD8D6C39ECB1C627842554C88BCFCCAF5F907FEB92A7B5E9");
+    auto reported = [](Json const& result) {
+        auto id = reported_network_id(result);
+        EXPECT_TRUE(id);
+        return id ? *id : 0;
+    };
+    EXPECT_EQ(reported(Json{{"info", {{"network_id", 21337}}}}), 21337u);
+    EXPECT_EQ(reported(Json{{"info", {{"network_id", "21337"}}}}), 21337u);
+    EXPECT_EQ(reported(Json{{"info", {{"complete_ledgers", "32570-100"}}}}), 0u);
+    EXPECT_EQ(reported(Json{{"info", {{"network_id", 0}}}}), 0u);
+    EXPECT_FALSE(reported_network_id(Json{{"error", "notSupported"}}));
+    EXPECT_FALSE(reported_network_id(Json::object()));
+    EXPECT_EQ(network_id_from_node(0, false, 21337), 21337u);
+    EXPECT_EQ(network_id_from_node(21337, true, 21337), 21337u);
+    EXPECT_EQ(network_id_from_node(0, false, std::nullopt), 0u);
+    EXPECT_THROW(network_id_from_node(0, true, 21337), Blocked);
+    EXPECT_THROW(reported_network_id(Json{{"info", {{"network_id", -1}}}}), Error);
+    // A node that reports Xahau selects Xahau hubs, not mainnet's full-history peers.
+    auto xahau = network_id_from_node(0, false, reported_network_id(Json{{"info", {{"network_id", 21337}}}}));
+    EXPECT_EQ(default_peers(xahau), (std::vector<std::string>{"bacab.alloy.ee:21337", "hubs.xahau.as16089.net:21337",
+                                                              "xahau-1.cabbit.tech:21337", "xahau-2.cabbit.tech:21337"}));
+    EXPECT_TRUE(full_history_peers(xahau).empty());
+    EXPECT_FALSE(full_history_peers(network_id_from_node(0, false, 0)).empty());
     EXPECT_TRUE(default_peers(9).empty());
     // A network with no hubs known by name needs its peers listed.
     PeerLedgers::Options options;

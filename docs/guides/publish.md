@@ -181,7 +181,10 @@ list does not hash to the transaction root in the ledger header. It then reads t
 transaction tree from peers, checks every node against that root, and keeps the raw bytes, so
 the archive is complete and nothing has to be decoded. Ledgers xrpld refuses outright (2014's
 6,409,247) are read the same way. This is on by default (`--history-peers default`): it asks
-the peers the network's crawl lists as holding the ledger, then a few known full-history peers.
+the peers that network's crawl lists as holding the ledger, then that network's known
+full-history peers (mainnet has some; Xahau does not). The network is the id the source node
+reports in `server_info` (`network_id`; xrpld omits it on mainnet). `--network-id` names one
+instead, and a node on a different network stops the run.
 Give `--history-peers HOST:PORT,...` to use your own. With `--history-peers none` the publisher
 stops at such a ledger and exits 3, and `live_publisher.py` leaves the follower stopped and
 reports it in `status.json` and `--health`. If no peer can serve the ledger, the publisher

@@ -19,9 +19,11 @@ Common conventions:
   `--publisher-key` given must be the listed key.
 - **Ranges** (`--range`): `A-B`, or `A-` for A to the publication's tip. The v2 archive commands
   also take `latest-N` and `Nd`.
-- **Network** (`--network-id`): `mainnet` (default), `testnet`, `devnet`, `xahau` (xahaud, also
+- **Network** (`--network-id`): `mainnet`, `testnet`, `devnet`, `xahau` (xahaud, also
   `xahaud`), `xahau-testnet`, or a numeric network ID. The named networks bring their public
-  hubs and validator list. One process follows one network.
+  hubs and validator list. One process follows one network. `publish` and `export` from a node
+  use the network id that node reports in `server_info` when this flag is omitted (xrpld omits
+  the field on mainnet). A named id the node does not report stops the run.
 - `--jobs` values are 1-32.
 
 ## Profiles
@@ -104,7 +106,7 @@ Main `publish` options (`export` shares the source options):
 | `--merge-chunks` | merge small chunks (for a follower polling every few seconds) |
 | `--interval-snapshots N` | write a state snapshot every N ledgers |
 | `--full-state`, `--no-rpc-cache` | compare complete states (no diffs); do not cache RPC responses |
-| `--history-peers default\|none\|HOST:PORT,...` [`--history-identity FILE`] | where to fetch raw transaction trees a gRPC source omits (a few 2013 ledgers) and ledgers it refuses; `default` (the default) asks peers the crawl lists as holding the ledger, then known full-history peers; `none` stops at such a ledger, exiting 3 |
+| `--history-peers default\|none\|HOST:PORT,...` [`--history-identity FILE`] | where to fetch raw transaction trees a source omits and ledgers it refuses; `default` (the default) asks peers that network's crawl lists as holding the ledger, then its known full-history peers (mainnet only; the network is the node's `server_info` id unless `--network-id` names one); `none` stops at such a ledger, exiting 3 |
 | `--validator-list URL --validator-list-key HEX --validations-node ws[s]://...` | end each batch at a ledger a quorum of the list signed |
 | `--peers default\|HOST:PORT,...` | follow the peer network instead of a node (no `--source`); the `--peer-*` options are those of [PEER-SERVING.md](../PEER-SERVING.md#settings) |
 

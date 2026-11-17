@@ -24,6 +24,7 @@
 #include <atomic>
 #include <cctype>
 #include <charconv>
+#include <cstdint>
 #include <condition_variable>
 #include <initializer_list>
 #include <iostream>
@@ -167,6 +168,32 @@ std::uint32_t parse_network(std::string const& text) {
     if (text.empty() || ec != std::errc{} || end != text.data() + text.size())
         throw Error("Unknown network '" + text + "': mainnet, testnet, devnet, xahau, xahau-testnet or a network ID");
     return id;
+}
+std::optional<std::uint32_t> reported_network_id(Json const& server_info) {
+    if (!server_info.is_object() || server_info.contains("error") || !server_info.contains("info") || !server_info.at("info").is_object())
+        return std::nullopt;
+    auto const& info = server_info.at("info");
+    if (!info.contains("network_id") || info.at("network_id").is_null()) return 0;
+    auto const& id = info.at("network_id");
+    if (id.is_string()) {
+        try { return parse_network(id.get<std::string>()); }
+        catch (Error const&) { throw Error("The source reported a network id that is not a network id"); }
+    }
+    if (id.is_number_unsigned()) {
+        auto number = id.get<std::uint64_t>();
+        if (number > UINT32_MAX) throw Error("The source reported a network id that is not a network id");
+        return static_cast<std::uint32_t>(number);
+    }
+    if (!id.is_number_integer()) throw Error("The source reported a network id that is not a network id");
+    auto number = id.get<std::int64_t>();
+    if (number < 0) throw Error("The source reported a network id that is not a network id");
+    return static_cast<std::uint32_t>(number);
+}
+std::uint32_t network_id_from_node(std::uint32_t given, bool named, std::optional<std::uint32_t> reported) {
+    if (!reported) return given;
+    if (named && given != *reported)
+        throw Blocked("The source is on network " + std::to_string(*reported) + ", not " + std::to_string(given));
+    return *reported;
 }
 std::vector<std::string> default_peers(std::uint32_t network_id) {
     auto network = network_defaults(network_id);

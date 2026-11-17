@@ -103,6 +103,10 @@ struct ExportOptions {
     std::vector<std::string> history_peers;
     fs::path history_identity;
     std::uint32_t network_id = 0;
+    // True when the operator named `network_id` (--network-id, or [network] id). False: the
+    // source node's server_info network_id is the network history peers follow (a field xrpld
+    // omits on mainnet, so that report is 0). A named id the node disagrees with stops the run.
+    bool network_id_set = false;
     // After `source`, in order. A ledger the source does not hold (lgrNotFound), or a source
     // that cannot be reached, is asked of the next. http(s):// or ws(s)://. The first source
     // that answers is the one followed for the newest ledger: a local xrpld's admin port, which
@@ -231,6 +235,14 @@ void configure_network(std::uint32_t network_id);
 // "xahau-testnet" or "xahaud-testnet") or by its ID. Those named networks also bring their
 // public hubs and validator lists as defaults. One process follows one network.
 std::uint32_t parse_network(std::string const& text);
+// info.network_id of a server_info result. nullopt when the result is an error or has no info
+// object (the node did not say). 0 when info is present and network_id is absent or null:
+// xrpld omits it on mainnet. A present value that is not a network id throws.
+std::optional<std::uint32_t> reported_network_id(Json const& server_info);
+// The network a node source's history peers follow. No report: `given` stands (0 when the
+// operator did not name one). A report the operator named and that differs stops the run
+// (Blocked). Otherwise the node's id, which selects that network's hubs and full-history peers.
+std::uint32_t network_id_from_node(std::uint32_t given, bool named, std::optional<std::uint32_t> reported);
 // The validator list a network known by name uses, and its publisher's key; empty for any
 // other network.
 std::pair<std::string, std::string> network_validator_list(std::uint32_t network_id);
